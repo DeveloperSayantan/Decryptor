@@ -1,0 +1,59 @@
+﻿@model Decryptor.Models.DecryptViewModel
+
+@{
+    ViewData["Title"] = "Decrypt Password";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-lg border-0 rounded-4">
+                <div class="card-header bg-primary text-white text-center rounded-top-4">
+                    <h4 class="mb-0"><i class="bi bi-shield-lock"></i> Decrypt Password</h4>
+                </div>
+                <div class="card-body p-4">
+                    <form method="post" id="decryptForm">
+                        <div class="form-group mb-3">
+                            <label class="form-label fw-bold">Enter Encrypted Password</label>
+                            <input type="text" asp-for="EncryptedPassword"
+                                   class="form-control rounded-pill"
+                                   id="EncryptedPassword"
+                                   placeholder="Paste your encrypted text here" />
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <button type="submit" class="btn btn-success rounded-pill px-4">
+                                <i class="bi bi-unlock"></i> Decrypt
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" id="resetBtn">
+                                <i class="bi bi-arrow-counterclockwise"></i> Reset
+                            </button>
+                        </div>
+                    </form>
+
+                    @if (!string.IsNullOrEmpty(Model?.DecryptedPassword))
+                    {
+                        <div id="resultBox" class="alert alert-info mt-4 rounded-3 shadow-sm">
+                            <strong>Decrypted Password:</strong> @Model.DecryptedPassword
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById("resetBtn").addEventListener("click", function () {
+            // reset the text box manually
+            document.getElementById("EncryptedPassword").value = "";
+
+            // hide the result box if exists
+            const resultBox = document.getElementById("resultBox");
+            if (resultBox) {
+                resultBox.style.display = "none";
+            }
+        });
+    </script>
+}
