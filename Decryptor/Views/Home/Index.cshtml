@@ -33,8 +33,13 @@
 
                     @if (!string.IsNullOrEmpty(Model?.DecryptedPassword))
                     {
-                        <div id="resultBox" class="alert alert-info mt-4 rounded-3 shadow-sm">
-                            <strong>Decrypted Password:</strong> @Model.DecryptedPassword
+                        <div id="resultBox" class="alert alert-info mt-4 rounded-3 shadow-sm d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>Decrypted Password:</strong> <span id="decryptedPassword">@Model.DecryptedPassword</span>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary ms-3" onclick="copyPassword()">
+                                Copy
+                            </button>
                         </div>
                     }
                 </div>
@@ -55,5 +60,14 @@
                 resultBox.style.display = "none";
             }
         });
+
+            function copyPassword() {
+            var text = document.getElementById("decryptedPassword").innerText;
+            navigator.clipboard.writeText(text).then(function () {
+                alert("Password copied to clipboard!");
+            }).catch(function (err) {
+                console.error("Failed to copy: ", err);
+            });
+        }
     </script>
 }
