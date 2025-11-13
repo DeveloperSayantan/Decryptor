@@ -1,29 +1,39 @@
 ﻿@model Decryptor.Models.DecryptViewModel
-
 @{
-    ViewData["Title"] = "Decrypt Password";
+    ViewData["Title"] = "Decryptor";
 }
 
 <div class="container mt-5">
     <div class="row justify-content-center">
-        <div class="col-md-6">
+        <div class="col-md-8">
             <div class="card shadow-lg border-0 rounded-4">
                 <div class="card-header bg-primary text-white text-center rounded-top-4">
-                    <h4 class="mb-0"><i class="bi bi-shield-lock"></i> Decrypt Password</h4>
+                    <h4 class="mb-0"><i class="bi bi-shield-lock"></i> Decrypt User Passwords</h4>
                 </div>
+
                 <div class="card-body p-4">
-                    <form method="post" id="decryptForm">
+                    @* Note: added id and autocomplete="off" to the form *@
+                    <form method="post" id="decryptForm" autocomplete="off">
                         <div class="form-group mb-3">
-                            <label class="form-label fw-bold">Enter Encrypted Password</label>
-                            <input type="text" asp-for="EncryptedPassword"
-                                   class="form-control rounded-pill"
-                                   id="EncryptedPassword"
-                                   placeholder="Paste your encrypted text here" />
+                            <label class="form-label fw-bold">Select Environment</label>
+                            <select asp-for="Environment" class="form-control rounded-pill">
+                                <option value="">-- Select --</option>
+                                <option value="QA">QA</option>
+                                <option value="Stage">Stage</option>
+                                <option value="Prod">Prod</option>
+                            </select>
+
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label class="form-label fw-bold">Enter Usernames (comma or newline separated)</label>
+                            <textarea asp-for="UserNames" id="UserNames" rows="4" class="form-control rounded-3"
+                                      placeholder="Example: user1, user2&#10;or one per line..." autocomplete="off">@Model?.UserNames</textarea>
                         </div>
 
                         <div class="d-flex justify-content-between">
-                            <button type="submit" class="btn btn-success rounded-pill px-4">
-                                <i class="bi bi-unlock"></i> Decrypt
+                            <button type="submit" name="actionType" value="get" class="btn btn-primary rounded-pill px-4">
+                                <i class="bi bi-database"></i> Get Passwords
                             </button>
                             <button type="button" class="btn btn-outline-secondary rounded-pill px-4" id="resetBtn">
                                 <i class="bi bi-arrow-counterclockwise"></i> Reset
@@ -31,17 +41,42 @@
                         </div>
                     </form>
 
-                    @if (!string.IsNullOrEmpty(Model?.DecryptedPassword))
-                    {
-                        <div id="resultBox" class="alert alert-info mt-4 rounded-3 shadow-sm d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>Decrypted Password:</strong> <span id="decryptedPassword">@Model.DecryptedPassword</span>
+                    @* Results area. We keep it in DOM only when there are results *@
+                    <div id="resultsContainer">
+                        @if (Model.Results != null && Model.Results.Any())
+                        {
+                            <div class="d-flex justify-content-end mt-4" id="copyAllContainer">
+                                <button type="button" class="btn btn-success rounded-pill px-4" onclick="copyFullTable()">
+                                    <i class="bi bi-clipboard"></i> Copy All
+                                </button>
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary ms-3" onclick="copyPassword()">
-                                Copy
-                            </button>
-                        </div>
-                    }
+
+                            <table id="resultTable" class="table table-bordered table-striped mt-3">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Username</th>
+                                        <th>Password</th>
+                                        <th>Copy</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var row in Model.Results)
+                                    {
+                                        <tr>
+                                            <td>@row.UserName</td>
+                                            <td>@row.DecryptedPassword</td>
+                                            <td>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                        onclick="copyText('@row.DecryptedPassword')">
+                                                    Copy
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
                 </div>
             </div>
         </div>
@@ -50,24 +85,105 @@
 
 @section Scripts {
     <script>
-        document.getElementById("resetBtn").addEventListener("click", function () {
-            // reset the text box manually
-            document.getElementById("EncryptedPassword").value = "";
+        (function () {
+            const resetBtn = document.getElementById("resetBtn");
+            const form = document.getElementById("decryptForm");
 
-            // hide the result box if exists
-            const resultBox = document.getElementById("resultBox");
-            if (resultBox) {
-                resultBox.style.display = "none";
-            }
-        });
+            resetBtn.addEventListener("click", function (ev) {
+                // Prevent any default
+                ev.preventDefault();
 
-            function copyPassword() {
-            var text = document.getElementById("decryptedPassword").innerText;
-            navigator.clipboard.writeText(text).then(function () {
-                alert("Password copied to clipboard!");
-            }).catch(function (err) {
-                console.error("Failed to copy: ", err);
+                // 1) Reset the form inputs to their initial values
+                //    form.reset() resets the fields to initial HTML values (or blank if none).
+                form.reset();
+
+                // 2) Clear the textarea explicitly (useful if browser repopulates)
+                const userNames = document.getElementById("UserNames");
+                if (userNames) {
+                    userNames.value = "";
+                }
+
+                // 3) Remove results DOM so table won't reappear (no page reload)
+                const resultsContainer = document.getElementById("resultsContainer");
+                if (resultsContainer) {
+                    resultsContainer.innerHTML = ""; // remove results markup
+                }
+
+                // 4) Additionally clear any cached form values in inputs/selects (defensive)
+                document.querySelectorAll("#decryptForm input, #decryptForm textarea, #decryptForm select")
+                    .forEach(el => {
+                        // do not touch hidden inputs (like antiforgery token); only clear text-like controls
+                        const tag = el.tagName.toLowerCase();
+                        if (tag === "input") {
+                            const type = el.type.toLowerCase();
+                            if (type === "text" || type === "search" || type === "email" || type === "tel" || type === "url" || type === "password") {
+                                el.value = "";
+                            }
+                        } else if (tag === "textarea" || tag === "select") {
+                            el.value = "";
+                        }
+                    });
+
+                // 5) Remove focus for UX
+                document.activeElement && document.activeElement.blur();
             });
+        })();
+
+
+        function copyText(text) {
+            navigator.clipboard.writeText(text)
+                .then(() => {
+                    // better UX: small in-page toast instead of alert
+                    showTempMessage("Copied to clipboard!");
+                })
+                .catch(err => console.error("Copy failed: ", err));
+        }
+
+        function copyFullTable() {
+            const table = document.getElementById("resultTable");
+            if (!table) {
+                showTempMessage("No data to copy!");
+                return;
+            }
+
+            let textToCopy = "Username\tPassword\n"; // headers
+            const rows = table.querySelectorAll("tbody tr");
+
+            rows.forEach(row => {
+                const username = row.cells[0].innerText.trim();
+                const password = row.cells[1].innerText.trim();
+                textToCopy += `${username}\t${password}\n`;
+            });
+
+            navigator.clipboard.writeText(textToCopy)
+                .then(() => showTempMessage("All usernames and passwords copied!"))
+                .catch(err => console.error("Copy failed: ", err));
+        }
+
+        // helper: show a temporary toast-like message (no external libs)
+        function showTempMessage(msg, timeout = 1400) {
+            const id = "tempMessageDiv";
+            let el = document.getElementById(id);
+            if (!el) {
+                el = document.createElement("div");
+                el.id = id;
+                el.style.position = "fixed";
+                el.style.right = "20px";
+                el.style.bottom = "20px";
+                el.style.padding = "10px 14px";
+                el.style.background = "#222";
+                el.style.color = "#fff";
+                el.style.borderRadius = "6px";
+                el.style.boxShadow = "0 2px 6px rgba(0,0,0,0.3)";
+                el.style.zIndex = 9999;
+                document.body.appendChild(el);
+            }
+            el.innerText = msg;
+            el.style.opacity = "1";
+            setTimeout(() => {
+                el.style.transition = "opacity 300ms";
+                el.style.opacity = "0";
+            }, timeout);
         }
     </script>
 }
