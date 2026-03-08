@@ -20,7 +20,9 @@ namespace Decryptor.Controllers
             },
             {
                 "Prod",
-                "Server=10.48.16.234;Database=Survey_Core_DB_V2;User Id=read_only_user;Password=sql$developer#95641;Trusted_Connection=false;MultipleActiveResultSets=true;Encrypt=False;"
+                "Server=10.254.131.66;Database=Survey_Core_DB_V2;User Id=login_app_esigma;Password=kfgdhriuetwlgheiwpsn;Trusted_Connection=false;MultipleActiveResultSets=true;Encrypt=False;"
+
+
             }
         };
 
