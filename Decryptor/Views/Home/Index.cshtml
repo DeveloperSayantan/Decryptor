@@ -3,138 +3,274 @@
     ViewData["Title"] = "Decryptor";
 }
 
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card shadow-lg border-0 rounded-4">
-                <div class="card-header bg-primary text-white text-center rounded-top-4">
-                    <h4 class="mb-0"><i class="bi bi-shield-lock"></i> Decrypt User Passwords</h4>
-                </div>
 
-                <div class="card-body p-4">
-                    @* Note: added id and autocomplete="off" to the form *@
-                    <form method="post" id="decryptForm" autocomplete="off">
-                        <div class="form-group mb-3">
-                            <label class="form-label fw-bold">Select Environment</label>
-                            <select asp-for="Environment" class="form-control rounded-pill">
-                                <option value="">-- Select --</option>
-                                <option value="QA">QA</option>
-                                <option value="Stage">Stage</option>
-                                <option value="Prod">Prod</option>
-                            </select>
+                        <div class="card-body p-4">
+                            @if (!string.IsNullOrEmpty(Model?.Error))
+                            {
+                                <div class="alert alert-error">
+                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                    @Model.Error
+                                </div>
+                            }
 
-                        </div>
-
-                        <div class="form-group mb-3">
-                            <label class="form-label fw-bold">Enter Usernames (comma or newline separated)</label>
-                            <textarea asp-for="UserNames" id="UserNames" rows="4" class="form-control rounded-3"
-                                      placeholder="Example: user1, user2&#10;or one per line..." autocomplete="off">@Model?.UserNames</textarea>
-                        </div>
-
-                        <div class="d-flex justify-content-between">
-                            <button type="submit" name="actionType" value="get" class="btn btn-primary rounded-pill px-4">
-                                <i class="bi bi-database"></i> Get Passwords
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" id="resetBtn">
-                                <i class="bi bi-arrow-counterclockwise"></i> Reset
-                            </button>
-                        </div>
-                    </form>
-
-                    @* Results area. We keep it in DOM only when there are results *@
-                    <div id="resultsContainer">
-                        @if (Model.Results != null && Model.Results.Any())
-                        {
-                            <div class="d-flex justify-content-end mt-4" id="copyAllContainer">
-                                <button type="button" class="btn btn-success rounded-pill px-4" onclick="copyFullTable()">
-                                    <i class="bi bi-clipboard"></i> Copy All
-                                </button>
+                            <div id="tempMessageDiv"
+                                 class="alert alert-success shadow"
+                                 style="display:none;
+                                    position:fixed;
+                                    bottom:20px;
+                                    right:20px;
+                                    z-index:9999;
+                                    font-size:13px;
+                                    border-radius:8px;
+                                    min-width:180px;
+                                    padding:8px 12px;">
+                                <span id="tempMessageText"></span>
                             </div>
 
-                            <table id="resultTable" class="table table-bordered table-striped mt-3">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Username</th>
-                                        <th>Password</th>
-                                        <th>Copy</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var row in Model.Results)
-                                    {
-                                        <tr>
-                                            <td>@row.UserName</td>
-                                            <td>@row.DecryptedPassword</td>
-                                            <td>
-                                                <button type="button" class="btn btn-sm btn-outline-secondary"
-                                                        onclick="copyText('@row.DecryptedPassword')">
-                                                    Copy
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+                            <form method="post" id="decryptForm" autocomplete="off">
+                                <div class="row">
+                                    <div class="col-md-12 mb-4">
+                                        <label class="form-label fw-bold">
+                                            <i class="bi bi-server me-2"></i>Select Environment
+                                        </label>
+                                        <select asp-for="Environment" class="form-control" required>
+                                            <option value="">-- Select --</option>
+                                            <option value="Prod HSD">Prod HSD</option>
+                                            <option value="Prod ENSD">Prod ENSD</option>
+                                        </select>
+                                    </div>
+                                </div>
 
-@section Scripts {
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">
+                                        <i class="bi bi-person-lines-fill me-2"></i>Enter Usernames
+                                    </label>
+                                    <textarea asp-for="UserNames" id="UserNames" rows="4" class="form-control"
+                                              placeholder="Example: user1, user2&#10;or one per line..." autocomplete="off">@Model?.UserNames</textarea>
+                                    <small class="text-muted mt-2 d-block">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        Separate by commas, spaces, or new lines
+                                    </small>
+                                </div>
+
+                                <div class="d-flex justify-content-between flex-wrap gap-2">
+                                    <button type="submit" name="actionType" value="get" class="btn btn-primary px-4">
+                                        <i class="bi bi-database"></i> Get Passwords
+                                    </button>
+
+                                    <button type="submit" name="actionType" value="duplicate" class="btn btn-warning px-4">
+                                        <i class="bi bi-search"></i> Check Duplicate Users
+                                    </button>
+
+                                    <button type="button" class="btn btn-outline-secondary px-4" id="resetBtn">
+                                        <i class="bi bi-arrow-counterclockwise"></i> Reset
+                                    </button>
+                                </div>
+                            </form>
+
+                            <div id="resultsContainer">
+                                @if (Model?.Results != null && Model.Results.Any())
+                                {
+                                    <div class="stats-card">
+                                        <div class="row">
+                                            <div class="col-4">
+                                                <div class="stats-number">@Model.Results.Count</div>
+                                                <div class="stats-label">Total Users</div>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="stats-number">@Model.Results.Count(r => !string.IsNullOrEmpty(r.DecryptedPassword) && !r.DecryptedPassword.Contains("FAILED"))</div>
+                                                <div class="stats-label">Decrypted</div>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="stats-number">@Model.Results.Count(r => r.IsActive)</div>
+                                                <div class="stats-label">Active</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex justify-content-end mt-4">
+                                        <button type="button" class="btn btn-success px-4" onclick="copyFullTable()">
+                                            <i class="bi bi-clipboard"></i> Copy All
+                                        </button>
+                                    </div>
+
+                                    <div class="table-responsive">
+                                        <table id="resultTable" class="table table-bordered table-striped mt-3">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Username</th>
+                                                    <th>Full Name</th>
+                                                    <th>Email</th>
+                                                    <th>Status</th>
+                                                    <th>Password</th>
+                                                    <th>Copy</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var row in Model.Results)
+                                                {
+                                                    <tr>
+                                                        <td><strong>@row.UserName</strong></td>
+                                                        <td>@row.FullName</td>
+                                                        <td><i class="bi bi-envelope me-1"></i>@row.Email</td>
+                                                        <td>
+                                                            <span class="@(row.IsActive ? "badge-active" : "badge-inactive")">
+                                                                @(row.IsActive ? "Active" : "Inactive")
+                                                            </span>
+                                                        </td>
+                                                        <td class="password-cell" title="@row.DecryptedPassword">@row.DecryptedPassword</td>
+                                                        <td>
+                                                            <button class="copy-btn" onclick="copyText('@row.DecryptedPassword?.Replace("'", "\\'")')">
+                                                                <i class="bi bi-files me-1"></i>Copy
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+
+                                @if (Model?.DuplicateResults != null && Model.DuplicateResults.Any())
+                                {
+                                    <div class="mt-5">
+                                        <h5 class="mb-4">
+                                            <i class="bi bi-exclamation-diamond-fill text-warning me-2"></i>
+                                            Duplicate Users Found
+                                        </h5>
+
+                                        @foreach (var group in Model.DuplicateResults)
+                                        {
+                                            <div class="duplicate-group">
+                                                <div class="duplicate-header">
+                                                    @if (group.DuplicateCount > 1)
+                                                    {
+                                                        <span class="status-box status-duplicate">
+                                                            <i class="bi bi-person-fill-exclamation me-1"></i>
+                                                            @group.UserName - @group.DuplicateCount duplicate users found
+                                                        </span>
+                                                    }
+                                                    else if (group.DuplicateCount == 1)
+                                                    {
+                                                        <span class="status-box status-success">
+                                                            <i class="bi bi-check-circle me-1"></i>
+                                                            @group.UserName - No duplicate user found
+                                                        </span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="status-box status-warning">
+                                                            <i class="bi bi-x-circle me-1"></i>
+                                                            @group.UserName - User not found in database
+                                                        </span>
+                                                    }
+                                                </div>
+                                                @if (group.Users.Any())
+                                                 {
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm table-hover">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Username</th>
+                                                                <th>Full Name</th>
+                                                                <th>Email</th>
+                                                                <th>Status</th>
+                                                                <th>Logged In Info</th>
+                                                                <th>Browser Info</th>
+                                                                <th>Password</th>
+                                                                <th>Password Updated</th>
+                                                                <th>Password Modified Date</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            @foreach (var user in group.Users)
+                                                            {
+                                                                <tr>
+                                                                    <td>@user.UserName</td>
+
+                                                                    <td>@user.FullName</td>
+
+                                                                    <td>@user.Email</td>
+
+                                                                    <td>
+                                                                        <span class="@(user.IsActive ? "badge-active" : "badge-inactive")">
+                                                                            @user.Status
+                                                                        </span>
+                                                                    </td>
+
+                                                                    <td>
+                                                                        <span class="badge bg-info">
+                                                                            @user.loggedIn
+                                                                        </span>
+                                                                    </td>
+
+                                                                    <td>
+                                                                        @(string.IsNullOrEmpty(user.BrowserInfo) ? "-" : user.BrowserInfo)
+                                                                    </td>
+
+                                                                    <td class="password-cell" title="@user.DecryptedPassword">
+                                                                        @user.DecryptedPassword
+                                                                    </td>
+
+                                                                    <td>
+                                                                        <span class="badge @(user.IsPasswordModified ? "bg-success" : "bg-secondary")">
+                                                                            @user.passwordModified
+                                                                        </span>
+                                                                    </td>
+
+                                                                    <td>
+                                                                        @(user.PasswordModifiedOn?.ToString("yyyy-MM-dd HH:mm") ?? "-")
+                                                                    </td>
+                                                                </tr>
+                                                            }
+                                                            </tbody>
+                                                    </table>
+                                                </div>
+                                                }
+                                                else
+                                                {
+                                                    <div class="alert alert-warning m-2">
+                                                        No user record found in database.
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+
+                                @if ((Model?.Results == null || !Model.Results.Any()) && (Model?.DuplicateResults == null || !Model.DuplicateResults.Any()) && string.IsNullOrEmpty(Model?.Error))
+                                {
+                                    <div class="empty-state">
+                                        <i class="bi bi-inbox"></i>
+                                        <h5>No Results Yet</h5>
+                                        <p class="text-muted">Enter usernames and click Get Passwords or Find Duplicates to see results</p>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
     <script>
         (function () {
             const resetBtn = document.getElementById("resetBtn");
             const form = document.getElementById("decryptForm");
 
             resetBtn.addEventListener("click", function (ev) {
-                // Prevent any default
                 ev.preventDefault();
-
-                // 1) Reset the form inputs to their initial values
-                //    form.reset() resets the fields to initial HTML values (or blank if none).
                 form.reset();
 
-                // 2) Clear the textarea explicitly (useful if browser repopulates)
                 const userNames = document.getElementById("UserNames");
                 if (userNames) {
                     userNames.value = "";
                 }
 
-                // 3) Remove results DOM so table won't reappear (no page reload)
-                const resultsContainer = document.getElementById("resultsContainer");
-                if (resultsContainer) {
-                    resultsContainer.innerHTML = ""; // remove results markup
-                }
-
-                // 4) Additionally clear any cached form values in inputs/selects (defensive)
-                document.querySelectorAll("#decryptForm input, #decryptForm textarea, #decryptForm select")
-                    .forEach(el => {
-                        // do not touch hidden inputs (like antiforgery token); only clear text-like controls
-                        const tag = el.tagName.toLowerCase();
-                        if (tag === "input") {
-                            const type = el.type.toLowerCase();
-                            if (type === "text" || type === "search" || type === "email" || type === "tel" || type === "url" || type === "password") {
-                                el.value = "";
-                            }
-                        } else if (tag === "textarea" || tag === "select") {
-                            el.value = "";
-                        }
-                    });
-
-                // 5) Remove focus for UX
-                document.activeElement && document.activeElement.blur();
+                window.location.href = window.location.pathname;
             });
         })();
-
 
         function copyText(text) {
             navigator.clipboard.writeText(text)
                 .then(() => {
-                    // better UX: small in-page toast instead of alert
-                    showTempMessage("Copied to clipboard!");
+                        showTempMessage("Copied to clipboard!","success");
                 })
                 .catch(err => console.error("Copy failed: ", err));
         }
@@ -142,48 +278,45 @@
         function copyFullTable() {
             const table = document.getElementById("resultTable");
             if (!table) {
-                showTempMessage("No data to copy!");
+                    showTempMessage("No data to copy!","danger");
                 return;
             }
 
-            let textToCopy = "Username\tPassword\n"; // headers
+            let textToCopy = "Username\tFull Name\tEmail\tStatus\tPassword\n";
             const rows = table.querySelectorAll("tbody tr");
 
             rows.forEach(row => {
-                const username = row.cells[0].innerText.trim();
-                const password = row.cells[1].innerText.trim();
-                textToCopy += `${username}\t${password}\n`;
+                const cells = row.querySelectorAll("td");
+                textToCopy += `${cells[0]?.innerText.trim() || ''}\t${cells[1]?.innerText.trim() || ''}\t${cells[2]?.innerText.trim() || ''}\t${cells[3]?.innerText.trim() || ''}\t${cells[4]?.innerText.trim() || ''}\n`;
             });
 
             navigator.clipboard.writeText(textToCopy)
-                .then(() => showTempMessage("All usernames and passwords copied!"))
+                    .then(() => showTempMessage("All data copied to clipboard!","success"))
                 .catch(err => console.error("Copy failed: ", err));
         }
 
-        // helper: show a temporary toast-like message (no external libs)
-        function showTempMessage(msg, timeout = 1400) {
-            const id = "tempMessageDiv";
-            let el = document.getElementById(id);
-            if (!el) {
-                el = document.createElement("div");
-                el.id = id;
-                el.style.position = "fixed";
-                el.style.right = "20px";
-                el.style.bottom = "20px";
-                el.style.padding = "10px 14px";
-                el.style.background = "#222";
-                el.style.color = "#fff";
-                el.style.borderRadius = "6px";
-                el.style.boxShadow = "0 2px 6px rgba(0,0,0,0.3)";
-                el.style.zIndex = 9999;
-                document.body.appendChild(el);
+            function showTempMessage(msg, type = "success", timeout = 2000) {
+
+            const el = document.getElementById("tempMessageDiv");
+            const textEl = document.getElementById("tempMessageText");
+
+            if (!el || !textEl) {
+                console.log("Popup element not found");
+                return;
             }
-            el.innerText = msg;
-            el.style.opacity = "1";
+
+            // Change color
+            el.classList.remove("alert-success", "alert-danger", "alert-warning");
+            el.classList.add("alert-" + type);
+
+            textEl.innerText = msg;
+
+            // Show
+            el.style.display = "block";
+
+            // Hide automatically
             setTimeout(() => {
-                el.style.transition = "opacity 300ms";
-                el.style.opacity = "0";
+                el.style.display = "none";
             }, timeout);
-        }
-    </script>
 }
+    </script>

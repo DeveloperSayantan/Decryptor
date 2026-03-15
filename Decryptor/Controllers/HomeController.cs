@@ -11,18 +11,13 @@ namespace Decryptor.Controllers
         private readonly Dictionary<string, string> _connectionStrings = new()
         {
             {
-                "QA",
-                "Server=10.48.16.236;Database=Survey_Core_DB_New;User Id=sa;Password=nF5dK8sY3bQ2tG6rH7jL1zM4;Trusted_Connection=false;MultipleActiveResultSets=true;Encrypt=False;"
-            },
-            {
-                "Stage",
-                "Server=10.48.16.236;Database=Health_Core_DB_Stage;User Id=sa;Password=nF5dK8sY3bQ2tG6rH7jL1zM4;Trusted_Connection=false;MultipleActiveResultSets=true;Encrypt=False;"
-            },
-            {
-                "Prod",
+                "Prod HSD",
                 "Server=10.254.131.66;Database=Survey_Core_DB_V2;User Id=login_app_esigma;Password=kfgdhriuetwlgheiwpsn;Trusted_Connection=false;MultipleActiveResultSets=true;Encrypt=False;"
+            },
 
-
+            {
+                "Prod ENSD",
+                "Server=10.254.129.66;Database=Survey_Core_DB_V2;User Id=login_app_asuse;Password=eishfgvbwopdjhrtcjhw;Trusted_Connection=false;MultipleActiveResultSets=true;Encrypt=False;"
             }
         };
 
@@ -34,75 +29,211 @@ namespace Decryptor.Controllers
         [HttpPost]
         public IActionResult Index(DecryptViewModel model, string actionType)
         {
-            if (actionType == "get" && !string.IsNullOrEmpty(model.UserNames))
+            if (string.IsNullOrEmpty(model.Environment))
             {
-                try
+                ModelState.AddModelError("Environment", "Please select an environment");
+                return View(model);
+            }
+
+            var users = model.UserNames?
+                .Split(new[] { ',', '\n', '\r', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(u => u.Trim())
+                .Where(u => !string.IsNullOrWhiteSpace(u))
+                .Distinct()
+                .ToList();
+
+            if (users == null || !users.Any())
+            {
+                ModelState.AddModelError("UserNames", "Please enter at least one username");
+                return View(model);
+            }
+
+            try
+            {
+                if (actionType == "get")
                 {
-                    var users = model.UserNames
-                        .Split(new[] { ',', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
-                        .Select(u => u.Trim())
-                        .Distinct()
-                        .ToList();
-
-                    foreach (var user in users)
-                    {
-                        var encrypted = GetEncryptedPassword(model.Environment, user);
-                        var decrypted = string.Empty;
-
-                        if (!string.IsNullOrEmpty(encrypted))
-                        {
-                            try
-                            {
-                                decrypted = Decrypt(encrypted);
-                            }
-                            catch
-                            {
-                                decrypted = "Decryption failed";
-                            }
-                        }
-
-                        model.Results.Add(new UserPasswordResult
-                        {
-                            UserName = user,
-                            EncryptedPassword = encrypted ?? "Not Found",
-                            DecryptedPassword = decrypted ?? "-"
-                        });
-                    }
+                    model.Results = GetUserPasswords(model.Environment, users);
                 }
-                catch (Exception ex)
+                else if (actionType == "duplicate")
                 {
-                    model.Results.Add(new UserPasswordResult
-                    {
-                        UserName = "Error",
-                        EncryptedPassword = ex.Message,
-                        DecryptedPassword = ""
-                    });
+                    model.DuplicateResults = GetDuplicateUsers(model.Environment, users);
                 }
+            }
+            catch (Exception ex)
+            {
+                model.Error = $"Error: {ex.Message}";
             }
 
             return View(model);
         }
 
-        private string GetEncryptedPassword(string environment, string username)
+        private List<UserPasswordResult> GetUserPasswords(string environment, List<string> users)
         {
+            var results = new List<UserPasswordResult>();
+
             if (!_connectionStrings.ContainsKey(environment))
                 throw new Exception("Invalid environment selection.");
 
             string connectionString = _connectionStrings[environment];
-            string encryptedPassword = null;
 
             using SqlConnection conn = new SqlConnection(connectionString);
             conn.Open();
 
-            string query = "SELECT password FROM [Security].[login_user] WHERE user_name = @userName";
+            foreach (var user in users)
+            {
+                string query = "SELECT password, full_name, email, is_active, created_on FROM [Security].[login_user] WHERE user_name = @userName";
+                using SqlCommand cmd = new SqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@userName", user);
+
+                using SqlDataReader reader = cmd.ExecuteReader();
+
+                if (reader.Read())
+                {
+                    string encrypted = reader["password"].ToString();
+                    string decrypted = "";
+
+                    if (!string.IsNullOrEmpty(encrypted))
+                    {
+                        try
+                        {
+                            decrypted = Decrypt(encrypted);
+                        }
+                        catch
+                        {
+                            decrypted = "*** DECRYPTION FAILED ***";
+                        }
+                    }
+
+                    results.Add(new UserPasswordResult
+                    {
+                        UserName = user,
+                        FullName = reader["full_name"]?.ToString() ?? "-",
+                        Email = reader["email"]?.ToString() ?? "-",
+                        IsActive = reader["is_active"] != DBNull.Value && Convert.ToBoolean(reader["is_active"]),
+                        CreatedOn = reader["created_on"] != DBNull.Value ? Convert.ToDateTime(reader["created_on"]) : null,
+                        EncryptedPassword = encrypted ?? "Not Found",
+                        DecryptedPassword = decrypted ?? "-"
+                    });
+                }
+                else
+                {
+                    results.Add(new UserPasswordResult
+                    {
+                        UserName = user,
+                        FullName = "-",
+                        Email = "-",
+                        IsActive = false,
+                        CreatedOn = null,
+                        EncryptedPassword = "NOT FOUND",
+                        DecryptedPassword = "-"
+                    });
+                }
+            }
+
+            return results;
+        }
+
+        private List<DuplicateUserGroup> GetDuplicateUsers(string environment, List<string> users)
+        {
+            var duplicateGroups = new List<DuplicateUserGroup>();
+
+            if (!_connectionStrings.ContainsKey(environment))
+                throw new Exception("Invalid environment selection.");
+
+            string connectionString = _connectionStrings[environment];
+
+            using SqlConnection conn = new SqlConnection(connectionString);
+            conn.Open();
+
+            string userList = string.Join(",", users.Select(u => $"'{u.Replace("'", "''")}'"));
+
+            string query = $@"
+        SELECT 
+            id,
+            user_name,
+            password,
+            full_name,
+            email,
+            is_active,
+            is_loggedin,
+            browser_info,
+            is_Password_Updated,
+            password_Modified_on,
+            created_on
+        FROM [Security].[login_user]
+        WHERE user_name IN ({userList})
+        ORDER BY user_name, created_on";
+
             using SqlCommand cmd = new SqlCommand(query, conn);
-            cmd.Parameters.AddWithValue("@userName", username);
 
-            var result = cmd.ExecuteScalar();
-            if (result != null)
-                encryptedPassword = result.ToString();
+            using SqlDataReader reader = cmd.ExecuteReader();
 
-            return encryptedPassword;
+            var userGroups = new Dictionary<string, List<UserPasswordResult>>();
+
+            while (reader.Read())
+            {
+                string username = reader["user_name"].ToString();
+                string encrypted = reader["password"].ToString();
+                string decrypted = "";
+
+                try
+                {
+                    decrypted = Decrypt(encrypted);
+                }
+                catch
+                {
+                    decrypted = "*** DECRYPTION FAILED ***";
+                }
+
+                var userResult = new UserPasswordResult
+                {
+                    UserName = username,
+                    FullName = reader["full_name"]?.ToString() ?? "-",
+                    Email = reader["email"]?.ToString() ?? "-",
+                    IsActive = reader["is_active"] != DBNull.Value && Convert.ToBoolean(reader["is_active"]),
+                    IsLoggedin = reader["is_loggedin"] != DBNull.Value && Convert.ToBoolean(reader["is_loggedin"]),
+                    BrowserInfo = reader["browser_info"]?.ToString(),
+                    IsPasswordModified = reader["is_Password_Updated"] != DBNull.Value && Convert.ToBoolean(reader["is_Password_Updated"]),
+                    PasswordModifiedOn = reader["password_Modified_on"] != DBNull.Value
+                        ? Convert.ToDateTime(reader["password_Modified_on"])
+                        : null,
+                    CreatedOn = reader["created_on"] != DBNull.Value ? Convert.ToDateTime(reader["created_on"]) : null,
+                    EncryptedPassword = encrypted,
+                    DecryptedPassword = decrypted,
+                    Id = (reader["id"]).ToString() != "" ? Guid.Parse(reader["id"].ToString()) : Guid.Empty
+                };
+
+                if (!userGroups.ContainsKey(username))
+                    userGroups[username] = new List<UserPasswordResult>();
+
+                userGroups[username].Add(userResult);
+            }
+
+            foreach (var group in userGroups)
+            {
+                duplicateGroups.Add(new DuplicateUserGroup
+                {
+                    UserName = group.Key,
+                    DuplicateCount = group.Value.Count,
+                    Users = group.Value
+                });
+            }
+
+            // also handle users not found in DB
+            foreach (var inputUser in users)
+            {
+                if (!userGroups.ContainsKey(inputUser))
+                {
+                    duplicateGroups.Add(new DuplicateUserGroup
+                    {
+                        UserName = inputUser,
+                        DuplicateCount = 0,
+                        Users = new List<UserPasswordResult>()
+                    });
+                }
+            }
+
+            return duplicateGroups;
         }
 
         private string Decrypt(string cipherText)
