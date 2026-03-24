@@ -3,320 +3,384 @@
     ViewData["Title"] = "Decryptor";
 }
 
+<!-- MODERN HEADER -->
+<div class="modern-header">
+    <div class="logo-area">
+        <i class="bi bi-shield-lock-fill logo-icon"></i>
+        <h1>Decryptor<span style="font-weight:400; font-size:1rem;"> | Secure Vault</span></h1>
+    </div>
+    <div class="header-badge">
+        <i class="bi bi-key-fill me-1"></i> AES-256
+    </div>
+</div>
 
-                        <div class="card-body p-4">
-                            @if (!string.IsNullOrEmpty(Model?.Error))
-                            {
-                                <div class="alert alert-error">
-                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                                    @Model.Error
-                                </div>
-                            }
+<!-- MAIN SCROLL AREA -->
+<div class="main-scroll">
+    <div class="container-fluid px-4">
+        <!-- TWO CARD ENVIRONMENT SELECTION (No dropdown) -->
+        <div class="env-cards-row" id="envCardsContainer">
+            <div class="env-card" data-env="Prod HSD">
+                <div class="card-inner">
+                    <i class="bi bi-cloud-check-fill env-icon"></i>
+                    <div>
+                        <div class="env-title">Prod HSD</div>
+                        <div class="env-sub">House Hold Network</div>
+                    </div>
+                    <div class="check-badge" style="display: none;"><i class="bi bi-check-circle-fill"></i></div>
+                </div>
+            </div>
+            <div class="env-card" data-env="Prod ENSD">
+                <div class="card-inner">
+                    <i class="bi bi-globe2 env-icon"></i>
+                    <div>
+                        <div class="env-title">Prod ENSD</div>
+                        <div class="env-sub">Enterprise Network</div>
+                    </div>
+                    <div class="check-badge" style="display: none;"><i class="bi bi-check-circle-fill"></i></div>
+                </div>
+            </div>
+        </div>
 
-                            <div id="tempMessageDiv"
-                                 class="alert alert-success shadow"
-                                 style="display:none;
-                                    position:fixed;
-                                    bottom:20px;
-                                    right:20px;
-                                    z-index:9999;
-                                    font-size:13px;
-                                    border-radius:8px;
-                                    min-width:180px;
-                                    padding:8px 12px;">
-                                <span id="tempMessageText"></span>
-                            </div>
 
-                            <form method="post" id="decryptForm" autocomplete="off">
-                                <div class="row">
-                                    <div class="col-md-12 mb-4">
-                                        <label class="form-label fw-bold">
-                                            <i class="bi bi-server me-2"></i>Select Environment
-                                        </label>
-                                        <select asp-for="Environment" class="form-control" required>
-                                            <option value="">-- Select --</option>
-                                            <option value="Prod HSD">Prod HSD</option>
-                                            <option value="Prod ENSD">Prod ENSD</option>
-                                        </select>
-                                    </div>
-                                </div>
 
-                                <div class="mb-4">
-                                    <label class="form-label fw-bold">
-                                        <i class="bi bi-person-lines-fill me-2"></i>Enter Usernames
-                                    </label>
-                                    <textarea asp-for="UserNames" id="UserNames" rows="4" class="form-control"
-                                              placeholder="Example: user1, user2&#10;or one per line..." autocomplete="off">@Model?.UserNames</textarea>
-                                    <small class="text-muted mt-2 d-block">
-                                        <i class="bi bi-info-circle me-1"></i>
-                                        Separate by commas, spaces, or new lines
-                                    </small>
-                                </div>
+        <!-- TOAST MESSAGE DIV -->
+        <div id="tempMessageDiv" class="toast-message" style="display:none;">
+            <span id="tempMessageText"></span>
+        </div>
 
-                                <div class="d-flex justify-content-between flex-wrap gap-2">
-                                    <button type="submit" name="actionType" value="get" class="btn btn-primary px-4">
-                                        <i class="bi bi-database"></i> Get Passwords
-                                    </button>
+        <!-- MAIN FORM PANEL -->
+        <div class="glass-panel">
+            <form method="post" id="decryptForm" autocomplete="off">
+                <!-- hidden environment field to sync with selected card -->
+                <input type="hidden" asp-for="Environment" id="hiddenEnvironment" value="" />
 
-                                    <button type="submit" name="actionType" value="duplicate" class="btn btn-warning px-4">
-                                        <i class="bi bi-search"></i> Check Duplicate Users
-                                    </button>
+                <div class="mb-4">
+                    <div class="form-label-modern">
+                        <i class="bi bi-person-badge-fill"></i> ENTER USERNAMES
+                    </div>
+                    <textarea asp-for="UserNames" id="UserNames" rows="5" class="form-control form-control-glass"
+                              placeholder="user1, user2&#10;or one per line...">@Model?.UserNames</textarea>
+                    <small class="text-muted-light mt-2 d-block"><i class="bi bi-info-circle"></i> Separate by commas, spaces, or new lines</small>
+                </div>
 
-                                    <button type="button" class="btn btn-outline-secondary px-4" id="resetBtn">
-                                        <i class="bi bi-arrow-counterclockwise"></i> Reset
-                                    </button>
-                                </div>
-                            </form>
+                <div class="btn-group-custom">
+                    <button type="submit" name="actionType" value="get" class="btn-neon btn-primary-neon" id="btnGetPasswords">
+                        <i class="bi bi-database-fill"></i> Get Passwords
+                    </button>
+                    <button type="submit" name="actionType" value="duplicate" class="btn-neon btn-warning-neon" id="btnCheckDuplicate">
+                        <i class="bi bi-search-heart"></i> Check Duplicate Users
+                    </button>
+                    <button type="button" class="btn-neon btn-outline-light" id="resetBtn">
+                        <i class="bi bi-arrow-repeat"></i> Reset
+                    </button>
+                </div>
+            </form>
 
-                            <div id="resultsContainer">
-                                @if (Model?.Results != null && Model.Results.Any())
+            <!-- RESULTS CONTAINER -->
+            <div id="resultsContainer">
+                @{
+                    var hasResults = Model?.Results != null && Model.Results.Any();
+                    var hasDuplicateResults = Model?.DuplicateResults != null && Model.DuplicateResults.Any();
+                }
+
+                @if (hasResults)
+                {
+                    var decryptedCount = Model.Results.Count(r => !string.IsNullOrEmpty(r.DecryptedPassword) && !r.DecryptedPassword.Contains("FAILED"));
+                    var activeCount = Model.Results.Count(r => r.IsActive);
+
+                    <div class="stats-modern">
+                        <div class="stat-item">
+                            <div class="stat-number">@Model.Results.Count</div>
+                            <div>Total Users</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">@decryptedCount</div>
+                            <div>Decrypted</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">@activeCount</div>
+                            <div>Active</div>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end mb-3">
+                        <button type="button" class="btn-neon btn-primary-neon" onclick="copyFullTable()"><i class="bi bi-clipboard-data"></i> Copy All Table</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table-modern" id="resultTable">
+                            <thead>
+                                <tr><th>Username</th><th>Full Name</th><th>Email</th><th>Status</th><th>Password</th><th>Copy</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in Model.Results)
                                 {
-                                    <div class="stats-card">
-                                        <div class="row">
-                                            <div class="col-4">
-                                                <div class="stats-number">@Model.Results.Count</div>
-                                                <div class="stats-label">Total Users</div>
-                                            </div>
-                                            <div class="col-4">
-                                                <div class="stats-number">@Model.Results.Count(r => !string.IsNullOrEmpty(r.DecryptedPassword) && !r.DecryptedPassword.Contains("FAILED"))</div>
-                                                <div class="stats-label">Decrypted</div>
-                                            </div>
-                                            <div class="col-4">
-                                                <div class="stats-number">@Model.Results.Count(r => r.IsActive)</div>
-                                                <div class="stats-label">Active</div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    var escapedPassword = row.DecryptedPassword?.Replace("'", "\\'") ?? "";
+                                    <tr>
+                                        <td><strong>@row.UserName</strong></td>
+                                        <td>@row.FullName</td>
+                                        <td><i class="bi bi-envelope"></i> @row.Email</td>
+                                        <td><span class="@(row.IsActive ? "badge-active-new" : "badge-inactive-new")">@(row.IsActive ? "Active" : "Inactive")</span></td>
+                                        <td class="password-cell" title="@row.DecryptedPassword">@row.DecryptedPassword</td>
+                                        <td><button class="copy-btn-modern" onclick="copyText('@escapedPassword')"><i class="bi bi-files"></i> Copy</button></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
 
-                                    <div class="d-flex justify-content-end mt-4">
-                                        <button type="button" class="btn btn-success px-4" onclick="copyFullTable()">
-                                            <i class="bi bi-clipboard"></i> Copy All
-                                        </button>
-                                    </div>
-
+                @if (hasDuplicateResults)
+                {
+                    <div class="mt-5">
+                        <h5 class="mb-3"><i class="bi bi-diagram-3-fill text-warning me-2"></i> Duplicate Analysis</h5>
+                        @foreach (var group in Model.DuplicateResults)
+                        {
+                            <div class="duplicate-group-modern">
+                                <div class="mb-2">
+                                    @if (group.DuplicateCount > 1)
+                                    {
+                                        <span class="status-badge" style="background:#dc2626;"><i class="bi bi-exclamation-triangle-fill"></i> @group.UserName - @group.DuplicateCount duplicates</span>
+                                    }
+                                    else if (group.DuplicateCount == 1)
+                                    {
+                                        <span class="status-badge" style="background:#10b981;"><i class="bi bi-check-circle"></i> @group.UserName - No duplicate</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="status-badge" style="background:#f97316;"><i class="bi bi-question-circle"></i> @group.UserName - Not found</span>
+                                    }
+                                </div>
+                                @if (group.Users != null && group.Users.Any())
+                                {
                                     <div class="table-responsive">
-                                        <table id="resultTable" class="table table-bordered table-striped mt-3">
-                                            <thead class="table-light">
-                                                <tr>
-                                                    <th>Username</th>
-                                                    <th>Full Name</th>
-                                                    <th>Email</th>
-                                                    <th>Status</th>
-                                                    <th>Password</th>
-                                                    <th>Copy</th>
-                                                </tr>
+                                        <table class="table table-sm text-white" style="border-color:#334155;">
+                                            <thead>
+                                                <tr><th>Username</th><th>Full Name</th><th>Email</th><th>Status</th><th>Logged In</th><th>Browser</th><th>Password</th><th>Pwd Updated</th><th>Modified Date</th></tr>
                                             </thead>
                                             <tbody>
-                                                @foreach (var row in Model.Results)
+                                                @foreach (var user in group.Users)
                                                 {
                                                     <tr>
-                                                        <td><strong>@row.UserName</strong></td>
-                                                        <td>@row.FullName</td>
-                                                        <td><i class="bi bi-envelope me-1"></i>@row.Email</td>
-                                                        <td>
-                                                            <span class="@(row.IsActive ? "badge-active" : "badge-inactive")">
-                                                                @(row.IsActive ? "Active" : "Inactive")
-                                                            </span>
-                                                        </td>
-                                                        <td class="password-cell" title="@row.DecryptedPassword">@row.DecryptedPassword</td>
-                                                        <td>
-                                                            <button class="copy-btn" onclick="copyText('@row.DecryptedPassword?.Replace("'", "\\'")')">
-                                                                <i class="bi bi-files me-1"></i>Copy
-                                                            </button>
-                                                        </td>
+                                                        <td>@user.UserName</td>
+                                                        <td>@user.FullName</td>
+                                                        <td>@user.Email</td>
+                                                        <td><span class="@(user.IsActive ? "badge-active-new" : "badge-inactive-new")">@user.Status</span></td>
+                                                        <td>@user.loggedIn</td>
+                                                        <td>@(string.IsNullOrEmpty(user.BrowserInfo) ? "-" : user.BrowserInfo)</td>
+                                                        <td class="password-cell">@user.DecryptedPassword</td>
+                                                        <td><span class="badge @(user.IsPasswordModified ? "bg-success" : "bg-secondary")">@user.passwordModified</span></td>
+                                                        <td>@(user.PasswordModifiedOn?.ToString("yyyy-MM-dd HH:mm") ?? "-")</td>
                                                     </tr>
                                                 }
                                             </tbody>
                                         </table>
                                     </div>
                                 }
-
-                                @if (Model?.DuplicateResults != null && Model.DuplicateResults.Any())
+                                else
                                 {
-                                    <div class="mt-5">
-                                        <h5 class="mb-4">
-                                            <i class="bi bi-exclamation-diamond-fill text-warning me-2"></i>
-                                            Duplicate Users Found
-                                        </h5>
-
-                                        @foreach (var group in Model.DuplicateResults)
-                                        {
-                                            <div class="duplicate-group">
-                                                <div class="duplicate-header">
-                                                    @if (group.DuplicateCount > 1)
-                                                    {
-                                                        <span class="status-box status-duplicate">
-                                                            <i class="bi bi-person-fill-exclamation me-1"></i>
-                                                            @group.UserName - @group.DuplicateCount duplicate users found
-                                                        </span>
-                                                    }
-                                                    else if (group.DuplicateCount == 1)
-                                                    {
-                                                        <span class="status-box status-success">
-                                                            <i class="bi bi-check-circle me-1"></i>
-                                                            @group.UserName - No duplicate user found
-                                                        </span>
-                                                    }
-                                                    else
-                                                    {
-                                                        <span class="status-box status-warning">
-                                                            <i class="bi bi-x-circle me-1"></i>
-                                                            @group.UserName - User not found in database
-                                                        </span>
-                                                    }
-                                                </div>
-                                                @if (group.Users.Any())
-                                                 {
-                                                <div class="table-responsive">
-                                                    <table class="table table-sm table-hover">
-                                                        <thead>
-                                                            <tr>
-                                                                <th>Username</th>
-                                                                <th>Full Name</th>
-                                                                <th>Email</th>
-                                                                <th>Status</th>
-                                                                <th>Logged In Info</th>
-                                                                <th>Browser Info</th>
-                                                                <th>Password</th>
-                                                                <th>Password Updated</th>
-                                                                <th>Password Modified Date</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            @foreach (var user in group.Users)
-                                                            {
-                                                                <tr>
-                                                                    <td>@user.UserName</td>
-
-                                                                    <td>@user.FullName</td>
-
-                                                                    <td>@user.Email</td>
-
-                                                                    <td>
-                                                                        <span class="@(user.IsActive ? "badge-active" : "badge-inactive")">
-                                                                            @user.Status
-                                                                        </span>
-                                                                    </td>
-
-                                                                    <td>
-                                                                        <span class="badge bg-info">
-                                                                            @user.loggedIn
-                                                                        </span>
-                                                                    </td>
-
-                                                                    <td>
-                                                                        @(string.IsNullOrEmpty(user.BrowserInfo) ? "-" : user.BrowserInfo)
-                                                                    </td>
-
-                                                                    <td class="password-cell" title="@user.DecryptedPassword">
-                                                                        @user.DecryptedPassword
-                                                                    </td>
-
-                                                                    <td>
-                                                                        <span class="badge @(user.IsPasswordModified ? "bg-success" : "bg-secondary")">
-                                                                            @user.passwordModified
-                                                                        </span>
-                                                                    </td>
-
-                                                                    <td>
-                                                                        @(user.PasswordModifiedOn?.ToString("yyyy-MM-dd HH:mm") ?? "-")
-                                                                    </td>
-                                                                </tr>
-                                                            }
-                                                            </tbody>
-                                                    </table>
-                                                </div>
-                                                }
-                                                else
-                                                {
-                                                    <div class="alert alert-warning m-2">
-                                                        No user record found in database.
-                                                    </div>
-                                                }
-                                            </div>
-                                        }
-                                    </div>
-                                }
-
-                                @if ((Model?.Results == null || !Model.Results.Any()) && (Model?.DuplicateResults == null || !Model.DuplicateResults.Any()) && string.IsNullOrEmpty(Model?.Error))
-                                {
-                                    <div class="empty-state">
-                                        <i class="bi bi-inbox"></i>
-                                        <h5>No Results Yet</h5>
-                                        <p class="text-muted">Enter usernames and click Get Passwords or Find Duplicates to see results</p>
-                                    </div>
+                                    <div class="alert alert-warning mt-2">No user record found.</div>
                                 }
                             </div>
-                        </div>
-
-    <script>
-        (function () {
-            const resetBtn = document.getElementById("resetBtn");
-            const form = document.getElementById("decryptForm");
-
-            resetBtn.addEventListener("click", function (ev) {
-                ev.preventDefault();
-                form.reset();
-
-                const userNames = document.getElementById("UserNames");
-                if (userNames) {
-                    userNames.value = "";
+                        }
+                    </div>
                 }
 
-                window.location.href = window.location.pathname;
-            });
-        })();
+                @if (!hasResults && !hasDuplicateResults && string.IsNullOrEmpty(Model?.Error))
+                {
+                    <div class="empty-state-modern">
+                        <i class="bi bi-inbox"></i>
+                        <h5>Ready to decrypt</h5>
+                        <p class="text-muted-light">Select environment, add usernames, and hit Get Passwords</p>
+                    </div>
+                }
 
-        function copyText(text) {
-            navigator.clipboard.writeText(text)
-                .then(() => {
-                        showTempMessage("Copied to clipboard!","success");
-                })
-                .catch(err => console.error("Copy failed: ", err));
+                @if (!string.IsNullOrEmpty(Model?.Error))
+                {
+                    <div class="alert alert-danger mt-3" style="background:#dc2626; border-radius: 24px; color:white;"><i class="bi bi-exclamation-triangle-fill"></i> @Model.Error</div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- FOOTER -->
+<div class="modern-footer">
+    <div><i class="bi bi-cpu"></i> Secure Decryption Engine</div>
+    <div class="status"><span class="status-dot"></span> Active | v3.0</div>
+</div>
+
+<script>
+    // ---------- TWO-CARD ENVIRONMENT LOGIC (replaces dropdown) ----------
+    const envCards = document.querySelectorAll('.env-card');
+    const hiddenEnvInput = document.getElementById('hiddenEnvironment');
+    const btnGetPasswords = document.getElementById('btnGetPasswords');
+    const btnCheckDuplicate = document.getElementById('btnCheckDuplicate');
+
+    // Find and hide original select if it exists
+    let originalSelect = document.querySelector('select[name="Environment"]');
+    if(originalSelect) {
+        originalSelect.style.display = 'none';
+    }
+
+    function setSelectedEnvironment(envValue) {
+        hiddenEnvInput.value = envValue;
+        if(originalSelect) {
+            originalSelect.value = envValue;
         }
+        // update card UI
+        envCards.forEach(card => {
+            const cardEnv = card.getAttribute('data-env');
+            const badgeSpan = card.querySelector('.check-badge');
+            if(cardEnv === envValue) {
+                card.classList.add('selected');
+                if(badgeSpan) badgeSpan.style.display = 'block';
+            } else {
+                card.classList.remove('selected');
+                if(badgeSpan) badgeSpan.style.display = 'none';
+            }
+        });
+    }
 
-        function copyFullTable() {
-            const table = document.getElementById("resultTable");
-            if (!table) {
-                    showTempMessage("No data to copy!","danger");
-                return;
+    function validateEnvironment() {
+        const selectedEnv = hiddenEnvInput.value;
+        if(!selectedEnv || selectedEnv === '') {
+            showTempMessage('⚠️ Please select an environment (Prod HSD or Prod ENSD) first!', 'warning', 5000);
+            return false;
+        }
+        return true;
+    }
+
+    // initialize default if any
+    let defaultEnv = '@Model?.Environment';
+    if(defaultEnv && defaultEnv !== '') {
+        setSelectedEnvironment(defaultEnv);
+    }
+
+    // add click event on cards
+    envCards.forEach(card => {
+        card.addEventListener('click', function(e) {
+            const envVal = this.getAttribute('data-env');
+            setSelectedEnvironment(envVal);
+            showTempMessage('Environment switched to ' + envVal, 'info', 1500);
+        });
+    });
+
+    // Add validation to form submission
+    const decryptForm = document.getElementById('decryptForm');
+
+    if(decryptForm) {
+        decryptForm.addEventListener('submit', function(e) {
+            if(!validateEnvironment()) {
+                e.preventDefault();
+                return false;
             }
 
-            let textToCopy = "Username\tFull Name\tEmail\tStatus\tPassword\n";
-            const rows = table.querySelectorAll("tbody tr");
-
-            rows.forEach(row => {
-                const cells = row.querySelectorAll("td");
-                textToCopy += `${cells[0]?.innerText.trim() || ''}\t${cells[1]?.innerText.trim() || ''}\t${cells[2]?.innerText.trim() || ''}\t${cells[3]?.innerText.trim() || ''}\t${cells[4]?.innerText.trim() || ''}\n`;
-            });
-
-            navigator.clipboard.writeText(textToCopy)
-                    .then(() => showTempMessage("All data copied to clipboard!","success"))
-                .catch(err => console.error("Copy failed: ", err));
-        }
-
-            function showTempMessage(msg, type = "success", timeout = 2000) {
-
-            const el = document.getElementById("tempMessageDiv");
-            const textEl = document.getElementById("tempMessageText");
-
-            if (!el || !textEl) {
-                console.log("Popup element not found");
-                return;
+            if(originalSelect && hiddenEnvInput.value) {
+                originalSelect.value = hiddenEnvInput.value;
             }
+        });
+    }
 
-            // Change color
-            el.classList.remove("alert-success", "alert-danger", "alert-warning");
-            el.classList.add("alert-" + type);
+    // Add click handlers for buttons with validation
+    if(btnGetPasswords) {
+        btnGetPasswords.addEventListener('click', function(e) {
+            if(!validateEnvironment()) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    }
 
-            textEl.innerText = msg;
+    if(btnCheckDuplicate) {
+        btnCheckDuplicate.addEventListener('click', function(e) {
+            if(!validateEnvironment()) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    }
 
-            // Show
-            el.style.display = "block";
+    // reset functionality
+    const resetBtn = document.getElementById("resetBtn");
+    const userNamesArea = document.getElementById("UserNames");
 
-            // Hide automatically
-            setTimeout(() => {
-                el.style.display = "none";
-            }, timeout);
-}
-    </script>
+    if(resetBtn) {
+        resetBtn.addEventListener("click", function(ev) {
+            ev.preventDefault();
+            if(userNamesArea) userNamesArea.value = "";
+            if(originalSelect) originalSelect.value = "";
+            if(hiddenEnvInput) hiddenEnvInput.value = "";
+            envCards.forEach(c => {
+                c.classList.remove('selected');
+                const badgeSpan = c.querySelector('.check-badge');
+                if(badgeSpan) badgeSpan.style.display = 'none';
+            });
+            window.location.href = window.location.pathname;
+        });
+    }
+
+    // copy functions
+    function copyText(text) {
+        if(!text) text = "";
+        navigator.clipboard.writeText(text).then(function() {
+            showTempMessage("✓ Copied to clipboard!", "success");
+        }).catch(function(err) {
+            console.error("Copy failed", err);
+            showTempMessage("✗ Copy failed", "danger");
+        });
+    }
+
+    function copyFullTable() {
+        const table = document.getElementById("resultTable");
+        if (!table) {
+            showTempMessage("No data to copy!", "danger");
+            return;
+        }
+        let textToCopy = "Username\tFull Name\tEmail\tStatus\tPassword\n";
+        const rows = table.querySelectorAll("tbody tr");
+        rows.forEach(function(row) {
+            const cells = row.querySelectorAll("td");
+            textToCopy += (cells[0]?.innerText.trim() || '') + '\t' +
+                         (cells[1]?.innerText.trim() || '') + '\t' +
+                         (cells[2]?.innerText.trim() || '') + '\t' +
+                         (cells[3]?.innerText.trim() || '') + '\t' +
+                         (cells[4]?.innerText.trim() || '') + '\n';
+        });
+        navigator.clipboard.writeText(textToCopy).then(function() {
+            showTempMessage("✓ All data copied!", "success");
+        }).catch(console.error);
+    }
+
+    function showTempMessage(msg, type, timeout) {
+        if(timeout === undefined) timeout = 2000;
+        const el = document.getElementById("tempMessageDiv");
+        const textEl = document.getElementById("tempMessageText");
+        if (!el || !textEl) return;
+
+        let bgColor = "#0f172ae6";
+        if(type === "danger") bgColor = "#991b1be6";
+        if(type === "warning") bgColor = "#b45309e6";
+        if(type === "info") bgColor = "#3b82f6e6";
+
+        el.style.background = bgColor;
+        if(type === "success") el.style.borderLeft = "4px solid #10b981";
+        else if(type === "danger") el.style.borderLeft = "4px solid #ef4444";
+        else if(type === "warning") el.style.borderLeft = "4px solid #f97316";
+        else el.style.borderLeft = "4px solid #3b82f6";
+
+        textEl.innerText = msg;
+        el.style.display = "block";
+        setTimeout(function() {
+            el.style.display = "none";
+        }, timeout);
+    }
+
+    // Ensure model binding works
+    window.addEventListener('DOMContentLoaded', function() {
+        let serverEnv = '@Model?.Environment';
+        if(serverEnv && serverEnv !== '' && hiddenEnvInput && hiddenEnvInput.value !== serverEnv) {
+            setSelectedEnvironment(serverEnv);
+        } else if(hiddenEnvInput && !hiddenEnvInput.value && serverEnv) {
+            setSelectedEnvironment(serverEnv);
+        }
+    });
+</script>

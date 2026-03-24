@@ -8,18 +8,12 @@ namespace Decryptor.Controllers
 {
     public class HomeController : Controller
     {
-        private readonly Dictionary<string, string> _connectionStrings = new()
-        {
-            {
-                "Prod HSD",
-                "Server=10.254.131.66;Database=Survey_Core_DB_V2;User Id=login_app_esigma;Password=kfgdhriuetwlgheiwpsn;Trusted_Connection=false;MultipleActiveResultSets=true;Encrypt=False;"
-            },
+        private readonly IConfiguration _configuration;
 
-            {
-                "Prod ENSD",
-                "Server=10.254.129.66;Database=Survey_Core_DB_V2;User Id=login_app_asuse;Password=eishfgvbwopdjhrtcjhw;Trusted_Connection=false;MultipleActiveResultSets=true;Encrypt=False;"
-            }
-        };
+        public HomeController(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
 
         public IActionResult Index()
         {
@@ -67,14 +61,16 @@ namespace Decryptor.Controllers
             return View(model);
         }
 
+        private string GetConnectionString(string environment)
+        {
+            return _configuration.GetConnectionString(environment)
+                ?? throw new Exception("Invalid environment selection.");
+        }
+
         private List<UserPasswordResult> GetUserPasswords(string environment, List<string> users)
         {
             var results = new List<UserPasswordResult>();
-
-            if (!_connectionStrings.ContainsKey(environment))
-                throw new Exception("Invalid environment selection.");
-
-            string connectionString = _connectionStrings[environment];
+            string connectionString = GetConnectionString(environment);
 
             using SqlConnection conn = new SqlConnection(connectionString);
             conn.Open();
@@ -86,23 +82,10 @@ namespace Decryptor.Controllers
                 cmd.Parameters.AddWithValue("@userName", user);
 
                 using SqlDataReader reader = cmd.ExecuteReader();
-
                 if (reader.Read())
                 {
                     string encrypted = reader["password"].ToString();
-                    string decrypted = "";
-
-                    if (!string.IsNullOrEmpty(encrypted))
-                    {
-                        try
-                        {
-                            decrypted = Decrypt(encrypted);
-                        }
-                        catch
-                        {
-                            decrypted = "*** DECRYPTION FAILED ***";
-                        }
-                    }
+                    string decrypted = !string.IsNullOrEmpty(encrypted) ? Decrypt(encrypted) : "";
 
                     results.Add(new UserPasswordResult
                     {
@@ -136,17 +119,12 @@ namespace Decryptor.Controllers
         private List<DuplicateUserGroup> GetDuplicateUsers(string environment, List<string> users)
         {
             var duplicateGroups = new List<DuplicateUserGroup>();
-
-            if (!_connectionStrings.ContainsKey(environment))
-                throw new Exception("Invalid environment selection.");
-
-            string connectionString = _connectionStrings[environment];
+            string connectionString = GetConnectionString(environment);
 
             using SqlConnection conn = new SqlConnection(connectionString);
             conn.Open();
 
             string userList = string.Join(",", users.Select(u => $"'{u.Replace("'", "''")}'"));
-
             string query = $@"
         SELECT 
             id,
@@ -165,7 +143,6 @@ namespace Decryptor.Controllers
         ORDER BY user_name, created_on";
 
             using SqlCommand cmd = new SqlCommand(query, conn);
-
             using SqlDataReader reader = cmd.ExecuteReader();
 
             var userGroups = new Dictionary<string, List<UserPasswordResult>>();
@@ -174,16 +151,7 @@ namespace Decryptor.Controllers
             {
                 string username = reader["user_name"].ToString();
                 string encrypted = reader["password"].ToString();
-                string decrypted = "";
-
-                try
-                {
-                    decrypted = Decrypt(encrypted);
-                }
-                catch
-                {
-                    decrypted = "*** DECRYPTION FAILED ***";
-                }
+                string decrypted = !string.IsNullOrEmpty(encrypted) ? Decrypt(encrypted) : "*** DECRYPTION FAILED ***";
 
                 var userResult = new UserPasswordResult
                 {
@@ -194,13 +162,11 @@ namespace Decryptor.Controllers
                     IsLoggedin = reader["is_loggedin"] != DBNull.Value && Convert.ToBoolean(reader["is_loggedin"]),
                     BrowserInfo = reader["browser_info"]?.ToString(),
                     IsPasswordModified = reader["is_Password_Updated"] != DBNull.Value && Convert.ToBoolean(reader["is_Password_Updated"]),
-                    PasswordModifiedOn = reader["password_Modified_on"] != DBNull.Value
-                        ? Convert.ToDateTime(reader["password_Modified_on"])
-                        : null,
+                    PasswordModifiedOn = reader["password_Modified_on"] != DBNull.Value ? Convert.ToDateTime(reader["password_Modified_on"]) : null,
                     CreatedOn = reader["created_on"] != DBNull.Value ? Convert.ToDateTime(reader["created_on"]) : null,
                     EncryptedPassword = encrypted,
                     DecryptedPassword = decrypted,
-                    Id = (reader["id"]).ToString() != "" ? Guid.Parse(reader["id"].ToString()) : Guid.Empty
+                    Id = Guid.TryParse(reader["id"].ToString(), out Guid id) ? id : Guid.Empty
                 };
 
                 if (!userGroups.ContainsKey(username))
@@ -219,7 +185,6 @@ namespace Decryptor.Controllers
                 });
             }
 
-            // also handle users not found in DB
             foreach (var inputUser in users)
             {
                 if (!userGroups.ContainsKey(inputUser))
@@ -241,19 +206,16 @@ namespace Decryptor.Controllers
             byte[] array = Convert.FromBase64String(cipherText);
 
             using Aes aes = Aes.Create();
-            Rfc2898DeriveBytes rfc2898DeriveBytes = new Rfc2898DeriveBytes(
+            var rfc = new Rfc2898DeriveBytes(
                 "CAGSI2021",
-                new byte[13] { 73, 118, 97, 110, 32, 77, 101, 100, 118, 101, 100, 101, 118 } // "Ivan Medvedev"
+                new byte[13] { 73, 118, 97, 110, 32, 77, 101, 100, 118, 101, 100, 101, 118 }
             );
 
-            aes.Key = rfc2898DeriveBytes.GetBytes(32);
-            aes.IV = rfc2898DeriveBytes.GetBytes(16);
+            aes.Key = rfc.GetBytes(32);
+            aes.IV = rfc.GetBytes(16);
 
             using MemoryStream memoryStream = new MemoryStream();
-            using (CryptoStream cryptoStream = new CryptoStream(
-                memoryStream,
-                aes.CreateDecryptor(),
-                CryptoStreamMode.Write))
+            using (CryptoStream cryptoStream = new CryptoStream(memoryStream, aes.CreateDecryptor(), CryptoStreamMode.Write))
             {
                 cryptoStream.Write(array, 0, array.Length);
                 cryptoStream.Close();
