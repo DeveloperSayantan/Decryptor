@@ -17,12 +17,86 @@ namespace Decryptor.Controllers
 
         public IActionResult Index()
         {
-            return View(new DecryptViewModel());
+            var model = new DecryptViewModel();
+
+            // Check which connection strings are available
+            var hsdExists = !string.IsNullOrEmpty(_configuration.GetConnectionString("Prod HSD"));
+            var ensdExists = !string.IsNullOrEmpty(_configuration.GetConnectionString("Prod ENSD"));
+
+            model.IsHSDAvailable = hsdExists;
+            model.IsENSDAvailable = ensdExists;
+
+            var availableEnvs = new List<string>();
+            if (hsdExists) availableEnvs.Add("Prod HSD");
+            if (ensdExists) availableEnvs.Add("Prod ENSD");
+
+            model.AvailableEnvironments = availableEnvs;
+
+            // If only one environment is available, auto-select it and lock it
+            if (availableEnvs.Count == 1)
+            {
+                model.Environment = availableEnvs[0];
+                model.IsEnvironmentLocked = true;
+
+                // Create appropriate message based on which environment is available
+                if (hsdExists && !ensdExists)
+                {
+                    model.LockedEnvironmentMessage = "Only Prod HSD is available. To access Prod ENSD, please visit: <a href='https://ensd.esigma.mospi.gov.in/Decryptor' target='_blank' style='color: #ffd966; text-decoration: underline;'>https://ensd.esigma.mospi.gov.in/Decryptor</a>";
+                }
+                else if (!hsdExists && ensdExists)
+                {
+                    model.LockedEnvironmentMessage = "Only Prod ENSD is available. To access Prod HSD, please visit: <a href='https://hsd.esigma.mospi.gov.in/Decryptor' target='_blank' style='color: #ffd966; text-decoration: underline;'>https://hsd.esigma.mospi.gov.in/Decryptor</a>";
+                }
+                else
+                {
+                    model.LockedEnvironmentMessage = "Environment selection is locked.";
+                }
+            }
+            else
+            {
+                model.IsEnvironmentLocked = false;
+            }
+
+            return View(model);
         }
 
         [HttpPost]
         public IActionResult Index(DecryptViewModel model, string actionType)
         {
+            // Re-check available environments for POST as well
+            var hsdExists = !string.IsNullOrEmpty(_configuration.GetConnectionString("Prod HSD"));
+            var ensdExists = !string.IsNullOrEmpty(_configuration.GetConnectionString("Prod ENSD"));
+
+            model.IsHSDAvailable = hsdExists;
+            model.IsENSDAvailable = ensdExists;
+
+            var availableEnvs = new List<string>();
+            if (hsdExists) availableEnvs.Add("Prod HSD");
+            if (ensdExists) availableEnvs.Add("Prod ENSD");
+
+            model.AvailableEnvironments = availableEnvs;
+
+            // If only one environment is available, lock it
+            if (availableEnvs.Count == 1)
+            {
+                model.Environment = availableEnvs[0];
+                model.IsEnvironmentLocked = true;
+
+                // Create appropriate message based on which environment is available
+                if (hsdExists && !ensdExists)
+                {
+                    model.LockedEnvironmentMessage = "Only Prod HSD is available. To access Prod ENSD, please visit: <a href='https://ensd.esigma.mospi.gov.in/Decryptor' target='_blank' style='color: #ffd966; text-decoration: underline;'>https://ensd.esigma.mospi.gov.in/Decryptor</a>";
+                }
+                else if (!hsdExists && ensdExists)
+                {
+                    model.LockedEnvironmentMessage = "Only Prod ENSD is available. To access Prod HSD, please visit: <a href='https://hsd.esigma.mospi.gov.in/Decryptor' target='_blank' style='color: #ffd966; text-decoration: underline;'>https://hsd.esigma.mospi.gov.in/Decryptor</a>";
+                }
+                else
+                {
+                    model.LockedEnvironmentMessage = "Environment selection is locked.";
+                }
+            }
+
             if (string.IsNullOrEmpty(model.Environment))
             {
                 ModelState.AddModelError("Environment", "Please select an environment");

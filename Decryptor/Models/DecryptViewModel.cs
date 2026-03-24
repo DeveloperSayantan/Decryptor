@@ -37,5 +37,12 @@ namespace Decryptor.Models
         public string Error { get; set; }
         public bool HasResults => Results != null && Results.Any();
         public bool HasDuplicateResults => DuplicateResults != null && DuplicateResults.Any();
+
+        public List<string> AvailableEnvironments { get; set; }
+        public bool IsEnvironmentLocked { get; set; }
+        public string LockedEnvironmentMessage { get; set; }
+
+        public bool IsHSDAvailable { get; set; }
+        public bool IsENSDAvailable { get; set; }
     }
 }

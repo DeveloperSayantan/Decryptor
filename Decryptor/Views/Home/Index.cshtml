@@ -19,7 +19,9 @@
     <div class="container-fluid px-4">
         <!-- TWO CARD ENVIRONMENT SELECTION (No dropdown) -->
         <div class="env-cards-row" id="envCardsContainer">
-            <div class="env-card" data-env="Prod HSD">
+            <div class="env-card @(Model?.IsHSDAvailable == true ? "" : "disabled")"
+                 data-env="Prod HSD"
+                 data-available="@(Model?.IsHSDAvailable == true ? "true" : "false")">
                 <div class="card-inner">
                     <i class="bi bi-cloud-check-fill env-icon"></i>
                     <div>
@@ -28,8 +30,19 @@
                     </div>
                     <div class="check-badge" style="display: none;"><i class="bi bi-check-circle-fill"></i></div>
                 </div>
+                @if (Model?.IsHSDAvailable == false)
+                {
+                    <div class="env-unavailable-badge">Unavailable</div>
+                    <div class="env-unavailable-link">
+                        <a href="https://hsd.esigma.mospi.gov.in/Decryptor" target="_blank" class="server-link">
+                            <i class="bi bi-box-arrow-up-right"></i> Access HSD Server
+                        </a>
+                    </div>
+                }
             </div>
-            <div class="env-card" data-env="Prod ENSD">
+            <div class="env-card @(Model?.IsENSDAvailable == true ? "" : "disabled")"
+                 data-env="Prod ENSD"
+                 data-available="@(Model?.IsENSDAvailable == true ? "true" : "false")">
                 <div class="card-inner">
                     <i class="bi bi-globe2 env-icon"></i>
                     <div>
@@ -38,10 +51,35 @@
                     </div>
                     <div class="check-badge" style="display: none;"><i class="bi bi-check-circle-fill"></i></div>
                 </div>
+                @if (Model?.IsENSDAvailable == false)
+                {
+                    <div class="env-unavailable-badge">Unavailable</div>
+                    <div class="env-unavailable-link">
+                        <a href="https://ensd.esigma.mospi.gov.in/Decryptor" target="_blank" class="server-link">
+                            <i class="bi bi-box-arrow-up-right"></i> Access ENSD Server
+                        </a>
+                    </div>
+                }
             </div>
         </div>
 
+        <!-- Locked Environment Message with HTML links -->
+        @if (Model?.IsEnvironmentLocked == true && !string.IsNullOrEmpty(Model?.LockedEnvironmentMessage))
+        {
+            <div class="alert alert-info mt-3" style="background: #3b82f6; border-radius: 16px; color: white; padding: 15px 20px;">
+                <i class="bi bi-lock-fill me-2"></i>
+                @Html.Raw(Model.LockedEnvironmentMessage)
+            </div>
+        }
 
+        <!-- Separate message if both environments are unavailable (edge case) -->
+        @if (Model?.IsHSDAvailable == false && Model?.IsENSDAvailable == false)
+        {
+            <div class="alert alert-danger mt-3" style="background: #dc2626; border-radius: 16px; color: white; padding: 15px 20px;">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                No environments are available. Please contact system administrator.
+            </div>
+        }
 
         <!-- TOAST MESSAGE DIV -->
         <div id="tempMessageDiv" class="toast-message" style="display:none;">
@@ -52,7 +90,7 @@
         <div class="glass-panel">
             <form method="post" id="decryptForm" autocomplete="off">
                 <!-- hidden environment field to sync with selected card -->
-                <input type="hidden" asp-for="Environment" id="hiddenEnvironment" value="" />
+                <input type="hidden" asp-for="Environment" id="hiddenEnvironment" value="@Model?.Environment" />
 
                 <div class="mb-4">
                     <div class="form-label-modern">
@@ -108,7 +146,14 @@
                     <div class="table-responsive">
                         <table class="table-modern" id="resultTable">
                             <thead>
-                                <tr><th>Username</th><th>Full Name</th><th>Email</th><th>Status</th><th>Password</th><th>Copy</th></tr>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Full Name</th>
+                                    <th>Email</th>
+                                    <th>Status</th>
+                                    <th>Password</th>
+                                    <th>Copy</th>
+                                </tr>
                             </thead>
                             <tbody>
                                 @foreach (var row in Model.Results)
@@ -154,7 +199,17 @@
                                     <div class="table-responsive">
                                         <table class="table table-sm text-white" style="border-color:#334155;">
                                             <thead>
-                                                <tr><th>Username</th><th>Full Name</th><th>Email</th><th>Status</th><th>Logged In</th><th>Browser</th><th>Password</th><th>Pwd Updated</th><th>Modified Date</th></tr>
+                                                <tr>
+                                                    <th>Username</th>
+                                                    <th>Full Name</th>
+                                                    <th>Email</th>
+                                                    <th>Status</th>
+                                                    <th>Logged In</th>
+                                                    <th>Browser</th>
+                                                    <th>Password</th>
+                                                    <th>Pwd Updated</th>
+                                                    <th>Modified Date</th>
+                                                </tr>
                                             </thead>
                                             <tbody>
                                                 @foreach (var user in group.Users)
@@ -163,11 +218,11 @@
                                                         <td>@user.UserName</td>
                                                         <td>@user.FullName</td>
                                                         <td>@user.Email</td>
-                                                        <td><span class="@(user.IsActive ? "badge-active-new" : "badge-inactive-new")">@user.Status</span></td>
-                                                        <td>@user.loggedIn</td>
+                                                        <td><span class="@(user.IsActive ? "badge-active-new" : "badge-inactive-new")">@(user.IsActive ? "Active" : "Inactive")</span></td>
+                                                        <td>@(user.IsLoggedin ? "Yes" : "No")</td>
                                                         <td>@(string.IsNullOrEmpty(user.BrowserInfo) ? "-" : user.BrowserInfo)</td>
                                                         <td class="password-cell">@user.DecryptedPassword</td>
-                                                        <td><span class="badge @(user.IsPasswordModified ? "bg-success" : "bg-secondary")">@user.passwordModified</span></td>
+                                                        <td><span class="badge @(user.IsPasswordModified ? "bg-success" : "bg-secondary")">@(user.IsPasswordModified ? "Yes" : "No")</span></td>
                                                         <td>@(user.PasswordModifiedOn?.ToString("yyyy-MM-dd HH:mm") ?? "-")</td>
                                                     </tr>
                                                 }
@@ -208,12 +263,15 @@
     <div class="status"><span class="status-dot"></span> Active | v3.0</div>
 </div>
 
+
 <script>
-    // ---------- TWO-CARD ENVIRONMENT LOGIC (replaces dropdown) ----------
+    // ---------- ENVIRONMENT SELECTION LOGIC ----------
     const envCards = document.querySelectorAll('.env-card');
     const hiddenEnvInput = document.getElementById('hiddenEnvironment');
     const btnGetPasswords = document.getElementById('btnGetPasswords');
     const btnCheckDuplicate = document.getElementById('btnCheckDuplicate');
+    const isEnvironmentLocked = @Json.Serialize(Model?.IsEnvironmentLocked ?? false);
+    const lockedMessage = '@Html.Raw(Model?.LockedEnvironmentMessage?.Replace("\"", "\\\"") ?? "")';
 
     // Find and hide original select if it exists
     let originalSelect = document.querySelector('select[name="Environment"]');
@@ -222,6 +280,11 @@
     }
 
     function setSelectedEnvironment(envValue) {
+        if(isEnvironmentLocked && envValue !== hiddenEnvInput.value) {
+            showTempMessage('Environment selection is locked! Please use the appropriate server.', 'warning', 3000);
+            return false;
+        }
+
         hiddenEnvInput.value = envValue;
         if(originalSelect) {
             originalSelect.value = envValue;
@@ -230,7 +293,7 @@
         envCards.forEach(card => {
             const cardEnv = card.getAttribute('data-env');
             const badgeSpan = card.querySelector('.check-badge');
-            if(cardEnv === envValue) {
+            if(cardEnv === envValue && card.getAttribute('data-available') === 'true') {
                 card.classList.add('selected');
                 if(badgeSpan) badgeSpan.style.display = 'block';
             } else {
@@ -238,6 +301,7 @@
                 if(badgeSpan) badgeSpan.style.display = 'none';
             }
         });
+        return true;
     }
 
     function validateEnvironment() {
@@ -249,16 +313,42 @@
         return true;
     }
 
-    // initialize default if any
+    // Initialize selection
     let defaultEnv = '@Model?.Environment';
     if(defaultEnv && defaultEnv !== '') {
         setSelectedEnvironment(defaultEnv);
+    } else {
+        // Auto-select the first available environment if none selected
+        const firstAvailableCard = Array.from(envCards).find(card => card.getAttribute('data-available') === 'true');
+        if(firstAvailableCard) {
+            const envVal = firstAvailableCard.getAttribute('data-env');
+            setSelectedEnvironment(envVal);
+        }
     }
 
-    // add click event on cards
+    // Add click event on cards
     envCards.forEach(card => {
         card.addEventListener('click', function(e) {
             const envVal = this.getAttribute('data-env');
+            const isAvailable = this.getAttribute('data-available') === 'true';
+
+            if(!isAvailable) {
+                // Show appropriate message with link for unavailable environment
+                if(envVal === 'Prod HSD') {
+                    showTempMessage('HSD environment is not available. Please use the HSD server: https://hsd.esigma.mospi.gov.in/Decryptor', 'warning', 5000);
+                } else if(envVal === 'Prod ENSD') {
+                    showTempMessage('ENSD environment is not available. Please use the ENSD server: https://ensd.esigma.mospi.gov.in/Decryptor', 'warning', 5000);
+                } else {
+                    showTempMessage('This environment is not available!', 'warning', 2000);
+                }
+                return;
+            }
+
+            if(isEnvironmentLocked) {
+                showTempMessage('Environment selection is locked! Please use the appropriate server.', 'warning', 3000);
+                return;
+            }
+
             setSelectedEnvironment(envVal);
             showTempMessage('Environment switched to ' + envVal, 'info', 1500);
         });
@@ -307,14 +397,22 @@
         resetBtn.addEventListener("click", function(ev) {
             ev.preventDefault();
             if(userNamesArea) userNamesArea.value = "";
-            if(originalSelect) originalSelect.value = "";
-            if(hiddenEnvInput) hiddenEnvInput.value = "";
-            envCards.forEach(c => {
-                c.classList.remove('selected');
-                const badgeSpan = c.querySelector('.check-badge');
-                if(badgeSpan) badgeSpan.style.display = 'none';
-            });
-            window.location.href = window.location.pathname;
+            if(!isEnvironmentLocked) {
+                if(originalSelect) originalSelect.value = "";
+                if(hiddenEnvInput) hiddenEnvInput.value = "";
+                envCards.forEach(c => {
+                    c.classList.remove('selected');
+                    const badgeSpan = c.querySelector('.check-badge');
+                    if(badgeSpan) badgeSpan.style.display = 'none';
+                });
+                // Auto-select first available after reset if needed
+                const firstAvailableCard = Array.from(envCards).find(card => card.getAttribute('data-available') === 'true');
+                if(firstAvailableCard) {
+                    const envVal = firstAvailableCard.getAttribute('data-env');
+                    setSelectedEnvironment(envVal);
+                }
+            }
+            showTempMessage("Form reset", "info", 1500);
         });
     }
 
@@ -339,11 +437,13 @@
         const rows = table.querySelectorAll("tbody tr");
         rows.forEach(function(row) {
             const cells = row.querySelectorAll("td");
-            textToCopy += (cells[0]?.innerText.trim() || '') + '\t' +
-                         (cells[1]?.innerText.trim() || '') + '\t' +
-                         (cells[2]?.innerText.trim() || '') + '\t' +
-                         (cells[3]?.innerText.trim() || '') + '\t' +
-                         (cells[4]?.innerText.trim() || '') + '\n';
+            if(cells.length >= 5) {
+                textToCopy += (cells[0]?.innerText.trim() || '') + '\t' +
+                             (cells[1]?.innerText.trim() || '') + '\t' +
+                             (cells[2]?.innerText.trim() || '') + '\t' +
+                             (cells[3]?.innerText.trim() || '') + '\t' +
+                             (cells[4]?.innerText.trim() || '') + '\n';
+            }
         });
         navigator.clipboard.writeText(textToCopy).then(function() {
             showTempMessage("✓ All data copied!", "success");
